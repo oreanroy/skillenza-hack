@@ -5,7 +5,7 @@ import asyncio
 import numpy as np
 import pickle
 
-
+size = 64,64
 loop = asyncio.get_event_loop()
 async def cli():
         reader, writer = await asyncio.open_connection('10.104.200.217', 9888,loop=loop)
@@ -18,11 +18,20 @@ async def cli():
         count = 0
 
         while (1):
-                print("came here")
-                frames = await reader.read(1)
-                print(frames)
+                frames = await reader.read(12288)
+                frames = np.frombuffer(frames,dtype='uint8')
+                if (len(frames)==12288):
+                    frame = frames.reshape((64,64,3))
+                    cv2.imshow('frame1',frame)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+                else:
+                    continue
                 Text   = await reader.read(1)
-                print (Text)
+                try:
+                    print (str(Text,encoding='utf-8'))
+                except:
+                    continue
                 #cv2.imshow('frame',frame)
                 #if cv2.waitKey(1) & 0xFF == ord('q'):
                 #    break

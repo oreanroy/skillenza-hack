@@ -34,11 +34,10 @@ async def cli():
                 send_frame = frame.tobytes()
                 #send_frame = pickle.dumps(frame)
                 writer.write(send_frame)
-                print(len(send_frame))
                 await writer.drain()
                 count = count+1
-                if count > 100:
-                        break
+                #if count > 100:
+                 #       break
 #resize = cv2.resize(image, (640, 480), interpolation = cv2.INTER_LINEAR) 
 #  cv2.imwrite("%03d.jpg" % count, resize)  
 

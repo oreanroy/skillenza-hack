@@ -17,52 +17,42 @@ from sklearn.model_selection import train_test_split
 import cv2
 import seaborn as sns
 
-
 def create_model():
     
     model = Sequential()
-    
     model.add(Conv2D(16, kernel_size = [3,3], padding = 'same', activation = 'relu', input_shape = (64,64,3)))
     model.add(Conv2D(32, kernel_size = [3,3], padding = 'same', activation = 'relu'))
     model.add(MaxPool2D(pool_size = [3,3]))
-    
     model.add(Conv2D(32, kernel_size = [3,3], padding = 'same', activation = 'relu'))
     model.add(Conv2D(64, kernel_size = [3,3], padding = 'same', activation = 'relu'))
     model.add(MaxPool2D(pool_size = [3,3]))
-    
     model.add(Conv2D(128, kernel_size = [3,3], padding = 'same', activation = 'relu'))
     model.add(Conv2D(256, kernel_size = [3,3], padding = 'same', activation = 'relu'))
     model.add(MaxPool2D(pool_size = [3,3]))
-    
     model.add(BatchNormalization())
-    
     model.add(Flatten())
     model.add(Dropout(0.5))
     model.add(Dense(512, activation = 'relu', kernel_regularizer = regularizers.l2(0.001)))
     model.add(Dense(29, activation = 'softmax'))
-    
     model.compile(optimizer = 'adam', loss = keras.losses.categorical_crossentropy, metrics = ["accuracy"])
-    
     print("MODEL CREATED")
     model.summary()
-    
     return model
 
 
 
 
-PeerDict = {'1':None,'2':None}
-i=1
 model = create_model()
+PeerDict = {"1":asyncio.Queue(),"2":asyncio.Queue()}
 
 
 
 
 class client_threadd():
 	def __init__(self,reader,writer,idd):
-		self.TextQueue = queue.Queue()
-		self.reader = reader
-		self.writer = writer
+		self.dataQueue = asyncio.Queue()
+		self.readerr = reader
+		self.writerr = writer
 		self.VideoChunkLen = 12288 
 		self.textChunkLen  = 256
 		self.MaxSizeSize   = 25
@@ -80,34 +70,52 @@ class client_threadd():
 
 	async def getPeerID(self):
 		#try:
-			Text = await self.reader.read(45)
+			Text = await self.readerr.read(45)
 			Text = pickle.loads(Text)
-			self.Peer = PeerDict[Text['PeerCode']]
+			self.Peer = Text['PeerCode']
 			self.sender = Text['Sender']
 			print(Text,self.sender,self.Peer)
 		#except:
 		#	await self.closeAll()
 
+
+
 	async def communicate(self):
 		await self.getPeerID()
+		size=64,64,3
 		while(1):
-			try:
-				if (self.sender == False):
-					return
-				frames = await self.reader.read(n=self.VideoChunkLen)
-				#print(frames,len(frames))
-				#frames_arr = pickle.load(frames)
-				frames1 = np.frombuffer(frames,dtype='uint8')
-				frames1 = frames1.reshape((1,64,64,3))
-				Text   = model.predict_classes(frames1)
-				print (np.argmax(Text),Text[0])
-				#Dict   = pickle.dumps({"text":Text,"frames":frames1})
-				#FramesToWrite = picke.dump(Dict)
-				#print(Dict,FramesToWrite)
-				#self.Peer.writer.write(FramesToWrite)
-				#await self.Peer.writer.drain()
-			except:
-				await self.closeAll()
+			#try:
+				if (not self.sender):
+					if (PeerDict["%d"%self.ID].empty()):
+						await asyncio.sleep(1)
+						continue
+					dataDict = await PeerDict["%d"%self.ID].get()
+					frames = dataDict['frames']
+					Text   = dataDict['text']
+					print(Text)
+					self.writerr.write(frames)
+					await self.writerr.drain()
+					self.writerr.write(bytes(Text))
+					await self.writerr.drain()
+				else:
+					frames = await self.readerr.read(n=self.VideoChunkLen)
+					#print(self.Peer.writerr.write(frames))
+					#await self.Peer.writerr.drain()
+					#print(frames,len(frames))
+					#frames_arr = pickle.load(frames)
+					frames2 = np.frombuffer(frames,dtype='uint8')
+					frames1 = frames2.reshape((1,64,64,3))
+					Text   = model.predict_classes(frames1)
+					Dict   = ({"text":Text[0],"frames":frames})
+					await PeerDict[self.Peer].put(Dict)
+					#print(PeerDict[self.Peer].qsize())
+					#print (list(self.Peer.dataQueue.queue))
+					#FramesToWrite = picke.dump(Dict)
+					#print(Dict,FramesToWrite)
+					#self.Peer.writerr.write(bytes(Text[0]))
+					#await self.Peer.writerr.drain()
+			#except:
+			#	await self.closeAll()
 
 
 	async def runCommunication(self):
@@ -117,17 +125,19 @@ class client_threadd():
 
 
 	async def closeAll(self):
-		print ("Came In")
+		print ("Came In",self.idd)
 		if not self.CommunicationTask.cancelled():
 			self.CommunicationTask.cancel()
 		self.writer.close()
 		await self.writer.wait_closed()
 
+i=1
+
+
 async def clientFD(reader,writer):
-	print("Connection 1")
 	global i
+	print("Connection %d"%i)
 	CT = client_threadd(reader,writer,i)
-	PeerDict["%d"%i] = CT
 	i+=1
 	CommunicationTask = asyncio.ensure_future(CT.runCommunication())
 	asyncio.gather(CommunicationTask)
@@ -138,6 +148,6 @@ async def serverAsync():
 	await server.serve_forever()
 
 if __name__=='__main__':
-	model.load_weights('Trained_model.h5')
+	model.load_weights('Final_model_asl.h5')
 	loop = asyncio.new_event_loop()
 	loop.run_until_complete(serverAsync())
