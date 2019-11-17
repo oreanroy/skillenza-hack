@@ -43,19 +43,18 @@ def create_model():
 
 
 model = create_model()
-PeerDict = {"1":asyncio.Queue(),"2":asyncio.Queue()}
+PeerDict = {"1":queue.Queue(),"2":queue.Queue()}
 
 
 
 
 class client_threadd():
 	def __init__(self,reader,writer,idd):
-		self.dataQueue = asyncio.Queue()
 		self.readerr = reader
 		self.writerr = writer
-		self.VideoChunkLen = 12288 
+		self.VideoChunkLen = 60000 
 		self.textChunkLen  = 256
-		self.MaxSizeSize   = 25
+		self.MaxSizeSize   = 40
 		self.ID            = idd
 		self.Peer          = None
 		self.sender        = True
@@ -73,6 +72,7 @@ class client_threadd():
 			Text = await self.readerr.read(45)
 			Text = pickle.loads(Text)
 			self.Peer = Text['PeerCode']
+			self.ID   = list(PeerDict.keys()-set([self.Peer]))[0]
 			self.sender = Text['Sender']
 			print(Text,self.sender,self.Peer)
 		#except:
@@ -82,39 +82,31 @@ class client_threadd():
 
 	async def communicate(self):
 		await self.getPeerID()
-		size=64,64,3
+		size=64,64
 		while(1):
 			#try:
 				if (not self.sender):
-					if (PeerDict["%d"%self.ID].empty()):
-						await asyncio.sleep(1)
+					if (PeerDict[self.ID].empty()):
+						await asyncio.sleep(0.5)
 						continue
-					dataDict = await PeerDict["%d"%self.ID].get()
+					dataDict = PeerDict[self.ID].get()
 					frames = dataDict['frames']
-					Text   = dataDict['text']
-					print(Text)
+					Text   = self.getStrSize(dataDict['text'])
+					#print(Text,len(bytes(Text,encoding='utf-8')))
 					self.writerr.write(frames)
 					await self.writerr.drain()
-					self.writerr.write(bytes(Text))
+					self.writerr.write(bytes(Text,encoding='utf-8'))
 					await self.writerr.drain()
 				else:
 					frames = await self.readerr.read(n=self.VideoChunkLen)
-					#print(self.Peer.writerr.write(frames))
-					#await self.Peer.writerr.drain()
-					#print(frames,len(frames))
-					#frames_arr = pickle.load(frames)
 					frames2 = np.frombuffer(frames,dtype='uint8')
-					frames1 = frames2.reshape((1,64,64,3))
+					frames1 = frames2.reshape((100,200,3))
+					frame = cv2.resize(frames1, size)
+					frames1 = frame.reshape((1,64,64,3))
 					Text   = model.predict_classes(frames1)
 					Dict   = ({"text":Text[0],"frames":frames})
-					await PeerDict[self.Peer].put(Dict)
-					#print(PeerDict[self.Peer].qsize())
-					#print (list(self.Peer.dataQueue.queue))
-					#FramesToWrite = picke.dump(Dict)
-					#print(Dict,FramesToWrite)
-					#self.Peer.writerr.write(bytes(Text[0]))
-					#await self.Peer.writerr.drain()
-			#except:
+					PeerDict[self.Peer].put(Dict)
+			#except ValueError:
 			#	await self.closeAll()
 
 
@@ -125,11 +117,11 @@ class client_threadd():
 
 
 	async def closeAll(self):
-		print ("Came In",self.idd)
+		print ("Came In",self.ID)
 		if not self.CommunicationTask.cancelled():
 			self.CommunicationTask.cancel()
-		self.writer.close()
-		await self.writer.wait_closed()
+		self.writerr.close()
+		await self.writerr.wait_closed()
 
 i=1
 
