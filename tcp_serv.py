@@ -84,7 +84,7 @@ class client_threadd():
 		await self.getPeerID()
 		size=64,64
 		while(1):
-			#try:
+			try:
 				if (not self.sender):
 					if (PeerDict[self.ID].empty()):
 						await asyncio.sleep(0.5)
@@ -106,8 +106,8 @@ class client_threadd():
 					Text   = model.predict_classes(frames1)
 					Dict   = ({"text":Text[0],"frames":frames})
 					PeerDict[self.Peer].put(Dict)
-			#except ValueError:
-			#	await self.closeAll()
+			except ValueError:
+				await self.closeAll()
 
 
 	async def runCommunication(self):
