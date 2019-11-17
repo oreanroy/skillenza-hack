@@ -7,6 +7,10 @@ import pickle
 
 size = 64,64
 loop = asyncio.get_event_loop()
+bottomLeftCornerOfText = (10,20)
+RevLabel = {0:'A',1:'B',2:'C',3:'D',4:'E',5:'F',6:'G',7:'H',8:'I',9:'J',10:'K',11:'L',12:'M',
+                   13:'N',14:'O',15:'P',16:'Q',17:'R',18:'S',19:'T',20:'U',21:'V',22:'W',23:'X',
+               24:'Y',25:'Z',26:'space',27:'del',29:'nothing'}
 async def cli():
         reader, writer = await asyncio.open_connection('10.104.200.217', 9888,loop=loop)
 
@@ -16,22 +20,28 @@ async def cli():
         writer.write(send_data)
         #await asyncio.sleep(6)
         count = 0
-
+        cv2.namedWindow('Resized Window', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('Resized Window', 400, 600)
         while (1):
-                frames = await reader.read(12288)
+                frames = await reader.read(60000)
                 frames = np.frombuffer(frames,dtype='uint8')
-                if (len(frames)==12288):
-                    frame = frames.reshape((64,64,3))
-                    cv2.imshow('frame1',frame)
+                if (len(frames)==60000):
+                    frame = frames.reshape((100,200,3))
+                    Text   = await reader.read(40)
+                    try:
+                        Text =  int(str(Text,encoding='utf-8'))
+                    except:
+                        continue
+                    Text = RevLabel[Text]
+                    print(Text)
+                    cv2.putText(frame,"The correct seq is: %s"%str(Text),bottomLeftCornerOfText,cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,0),1)
+                    cv2.imshow('Resized Window',frame)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         break
+                    #
                 else:
                     continue
-                Text   = await reader.read(1)
-                try:
-                    print (str(Text,encoding='utf-8'))
-                except:
-                    continue
+
                 #cv2.imshow('frame',frame)
                 #if cv2.waitKey(1) & 0xFF == ord('q'):
                 #    break
