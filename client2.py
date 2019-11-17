@@ -40,8 +40,7 @@ async def cli():
                         continue
                     Text = RevLabel[Text]
                     print(Text)
-                    app.save_audio(Text
-                        )
+                    app.save_audio("The correct seq is: %s"%str(Text))
                     cv2.putText(frame,"The correct seq is: %s"%str(Text),bottomLeftCornerOfText,cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,0),1)
                     cv2.imshow('Resized Window',frame)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
